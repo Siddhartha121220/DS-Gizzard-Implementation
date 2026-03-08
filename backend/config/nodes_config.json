@@ -1,0 +1,16 @@
+{
+    "servers": {
+        "Laptop1": {
+            "shards": {
+                "Shard1": {"host": "127.0.0.1", "port": 9091},
+                "Shard2": {"host": "127.0.0.1", "port": 9092}
+            }
+        },
+        "Laptop2": {
+            "shards": {
+                "Shard3": {"host": "127.0.0.1", "port": 9093},
+                "Shard4": {"host": "127.0.0.1", "port": 9094}
+            }
+        }
+    }
+}
