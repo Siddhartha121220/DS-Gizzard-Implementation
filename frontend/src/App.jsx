@@ -7,6 +7,9 @@ import ServerView from './components/ServerView';
 import ReplicationDashboard from './components/ReplicationDashboard';
 import ReplicaGraph from './components/ReplicaGraph';
 import NodeStorageViewer from './components/NodeStorageViewer';
+import NodeStatusDashboard from './components/NodeStatusDashboard';
+import FailoverEventLog from './components/FailoverEventLog';
+import ClusterHealthGraph from './components/ClusterHealthGraph';
 
 function App() {
   const [ringData, setRingData] = useState(null);
@@ -73,6 +76,24 @@ function App() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <ReplicaGraph />
             <NodeStorageViewer />
+          </div>
+        </section>
+
+        {/* Failover & Fault Tolerance Section */}
+        <section className="border-t-2 border-gray-300 pt-10">
+          <h2 className="text-3xl font-bold text-gray-800 mb-8 border-b-2 border-blue-500 pb-2">
+            Failover & Fault Tolerance Monitor
+          </h2>
+          
+          <div className="space-y-8">
+            {/* Node Status Dashboard */}
+            <NodeStatusDashboard />
+            
+            {/* Cluster Health Graphs */}
+            <ClusterHealthGraph />
+            
+            {/* Failover Event Log */}
+            <FailoverEventLog />
           </div>
         </section>
 
