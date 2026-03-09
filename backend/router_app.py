@@ -12,6 +12,11 @@ from thrift.protocol import TBinaryProtocol
 
 from router.consistent_hash import ConsistentHashRing
 from replication.replication_manager import ReplicationManager
+from failover.config import FailoverConfig
+from failover.node_registry import NodeRegistry
+from failover.node_health_monitor import NodeHealthMonitor
+from failover.event_logger import EventLogger
+from failover.failover_manager import FailoverManager
 
 sys.path.append('gen-py')
 from router_service import TweetService
@@ -55,6 +60,16 @@ for server_name, server_data in servers_info.items():
 
 # Initialize Replication Manager
 replication_manager = ReplicationManager(hash_ring, shard_lookup)
+
+# Initialize Failover System
+failover_config = FailoverConfig()
+node_registry = NodeRegistry(recovery_threshold=failover_config.RECOVERY_THRESHOLD)
+event_logger = EventLogger(failover_config.FAILOVER_LOG_FILE, failover_config.MAX_MEMORY_EVENTS)
+failover_manager = FailoverManager(shard_lookup, node_registry, event_logger, replication_manager, failover_config)
+health_monitor = NodeHealthMonitor(shard_lookup, node_registry, failover_config)
+
+# Auto-start health monitoring
+health_monitor.start()
 
 logging.basicConfig(level=logging.INFO)
 
@@ -118,7 +133,27 @@ def store_tweet():
         import traceback
         traceback.print_exc()
         logging.error(f"Error connecting to node {selected_node}: {e}")
-        return jsonify({"error": f"Failed to store tweet on {selected_node}: {str(e)}"}), 500
+        
+        # Handle write failure with failover
+        failover_result = failover_manager.handle_write_failure(
+            tweet_id, user_id, text, selected_node, e
+        )
+        
+        if failover_result["success"]:
+            server_name = shard_lookup[failover_result["node_used"]]["server"]
+            return jsonify({
+                "message": "Tweet stored successfully (failover)",
+                "node": failover_result["node_used"],
+                "server": server_name,
+                "tweet_id": tweet_id,
+                "hash_value": str(hash_value),
+                "failover": True
+            }), 201
+        else:
+            return jsonify({
+                "error": f"Failed to store tweet: {failover_result.get('error', str(e))}",
+                "failover_attempted": True
+            }), 500
 
 @app.route('/tweet/<tweet_id>', methods=['GET'])
 def get_tweet(tweet_id):
@@ -145,7 +180,23 @@ def get_tweet(tweet_id):
         return jsonify(tweet_data), 200
     except Exception as e:
         logging.error(f"Error fetching from node {selected_node}: {e}")
-        return jsonify({"error": f"Failed to retrieve tweet from {selected_node}: {str(e)}"}), 500
+        
+        # Handle read failure with failover
+        failover_result = failover_manager.handle_read_failure(
+            tweet_id, selected_node, e
+        )
+        
+        if failover_result["success"]:
+            return jsonify({
+                **failover_result["data"],
+                "failover": True,
+                "node_used": failover_result["node_used"]
+            }), 200
+        else:
+            return jsonify({
+                "error": f"Failed to retrieve tweet: {failover_result.get('error', str(e))}",
+                "failover_attempted": True
+            }), 500
 
 @app.route('/hash-ring', methods=['GET'])
 def get_hash_ring():
@@ -300,6 +351,22 @@ def get_replication_map():
         "replication_map": formatted_map,
         "stats": replication_manager.get_replication_stats()
     }), 200
+
+@app.route('/nodes/status', methods=['GET'])
+def get_nodes_status():
+    """Get status of all nodes."""
+    return jsonify(node_registry.get_all_status()), 200
+
+@app.route('/nodes/health', methods=['GET'])
+def get_nodes_health():
+    """Get detailed health info for all nodes."""
+    return jsonify(node_registry.get_all_health_info()), 200
+
+@app.route('/failover/logs', methods=['GET'])
+def get_failover_logs():
+    """Get recent failover events."""
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify(event_logger.get_recent_events(limit)), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
