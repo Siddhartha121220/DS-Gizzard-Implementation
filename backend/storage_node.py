@@ -17,16 +17,32 @@ class TweetServiceHandler:
     def __init__(self, node_id):
         self.node_id = node_id
         self.tweets = {}
+        self.replicas = set()  # Track which tweets are replicas
         logging.info(f"Initialized Storage Node: {self.node_id}")
 
-    def storeTweet(self, tweet_id, user_id, text):
-        logging.info(f"[{self.node_id}] Storing tweet ID {tweet_id} from User {user_id}")
+    def storeTweet(self, tweet_id, user_id, text, is_replica=False):
+        """
+        Store a tweet on this node.
+        
+        Args:
+            tweet_id: Unique tweet ID
+            user_id: User ID
+            text: Tweet text
+            is_replica: Boolean flag indicating if this is a replica copy
+        """
+        logging.info(
+            f"[{self.node_id}] Storing tweet ID {tweet_id} from User {user_id}"
+            f" (replica={is_replica})"
+        )
         self.tweets[tweet_id] = {
             "tweet_id": tweet_id,
             "user_id": user_id,
             "text": text,
-            "stored_on": self.node_id
+            "stored_on": self.node_id,
+            "is_replica": is_replica
         }
+        if is_replica:
+            self.replicas.add(tweet_id)
         return True
 
     def getTweet(self, tweet_id):
