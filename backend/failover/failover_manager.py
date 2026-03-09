@@ -15,7 +15,7 @@ from router_service import TweetService
 class FailoverManager:
     """Manages failover logic for read and write operations."""
     
-    def __init__(self, shard_lookup, node_registry, event_logger, replication_manager, config):
+    def __init__(self, shard_lookup, node_registry, event_logger, replication_manager, config, websocket_manager=None):
         """
         Initialize failover manager.
         
@@ -25,12 +25,14 @@ class FailoverManager:
             event_logger: EventLogger instance
             replication_manager: ReplicationManager instance
             config: FailoverConfig instance
+            websocket_manager: Optional WebSocketManager for real-time updates
         """
         self.shard_lookup = shard_lookup
         self.node_registry = node_registry
         self.event_logger = event_logger
         self.replication_manager = replication_manager
         self.config = config
+        self.websocket_manager = websocket_manager
     
     def handle_read_failure(self, tweet_id, primary_node, exception):
         """
@@ -89,6 +91,17 @@ class FailoverManager:
                 "failover", tweet_id, primary_node, replica_node, "read_failover",
                 f"Read redirected from {primary_node} to {replica_node}"
             )
+            
+            # Emit WebSocket event
+            if self.websocket_manager:
+                self.websocket_manager.emit_failover_event({
+                    "timestamp": self.event_logger.memory_events[-1]["timestamp"],
+                    "event_type": "failover",
+                    "tweet_id": tweet_id,
+                    "primary_node": primary_node,
+                    "replica_node": replica_node,
+                    "action": "read_failover"
+                })
             
             return {
                 "success": True,
@@ -152,6 +165,17 @@ class FailoverManager:
                 "failover", tweet_id, primary_node, replica_node, "write_failover",
                 f"Write redirected from {primary_node} to {replica_node}"
             )
+            
+            # Emit WebSocket event
+            if self.websocket_manager:
+                self.websocket_manager.emit_failover_event({
+                    "timestamp": self.event_logger.memory_events[-1]["timestamp"],
+                    "event_type": "failover",
+                    "tweet_id": tweet_id,
+                    "primary_node": primary_node,
+                    "replica_node": replica_node,
+                    "action": "write_failover"
+                })
             
             return {
                 "success": True,

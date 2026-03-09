@@ -95,14 +95,34 @@ class NodeHealthMonitor:
             # Parse response
             data = json.loads(response)
             if data.get('status') == 'alive':
+                old_status = self.node_registry.get_status(shard_name)
                 self.node_registry.record_success(shard_name)
+                new_status = self.node_registry.get_status(shard_name)
+                
+                # Emit WebSocket event if status changed
+                if self.websocket_manager and old_status != new_status:
+                    health_info = self.node_registry.get_health_info(shard_name)
+                    self.websocket_manager.emit_node_status_update(
+                        shard_name, new_status.value, health_info
+                    )
+                
                 logging.debug(f"[HealthCheck] {shard_name} is alive")
             else:
                 self.node_registry.record_failure(shard_name)
                 logging.warning(f"[HealthCheck] {shard_name} returned unexpected status")
         
         except Exception as e:
+            old_status = self.node_registry.get_status(shard_name)
             self.node_registry.record_failure(shard_name)
+            new_status = self.node_registry.get_status(shard_name)
+            
+            # Emit WebSocket event if status changed
+            if self.websocket_manager and old_status != new_status:
+                health_info = self.node_registry.get_health_info(shard_name)
+                self.websocket_manager.emit_node_status_update(
+                    shard_name, new_status.value, health_info
+                )
+            
             logging.warning(f"[HealthCheck] {shard_name} failed: {str(e)}")
     
     def check_node_now(self, shard_name):

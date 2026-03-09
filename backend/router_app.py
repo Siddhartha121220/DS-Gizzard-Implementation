@@ -6,6 +6,7 @@ import subprocess
 import socket
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_socketio import SocketIO
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
@@ -17,6 +18,7 @@ from failover.node_registry import NodeRegistry
 from failover.node_health_monitor import NodeHealthMonitor
 from failover.event_logger import EventLogger
 from failover.failover_manager import FailoverManager
+from failover.websocket_manager import WebSocketManager
 
 sys.path.append('gen-py')
 from router_service import TweetService
@@ -24,6 +26,7 @@ from router_service.ttypes import *
 
 app = Flask(__name__)
 CORS(app)  # Allow frontend to call APIs
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Load Node Configuration
 config_path = os.path.join("config", "nodes_config.json")
@@ -65,8 +68,9 @@ replication_manager = ReplicationManager(hash_ring, shard_lookup)
 failover_config = FailoverConfig()
 node_registry = NodeRegistry(recovery_threshold=failover_config.RECOVERY_THRESHOLD)
 event_logger = EventLogger(failover_config.FAILOVER_LOG_FILE, failover_config.MAX_MEMORY_EVENTS)
-failover_manager = FailoverManager(shard_lookup, node_registry, event_logger, replication_manager, failover_config)
-health_monitor = NodeHealthMonitor(shard_lookup, node_registry, failover_config)
+websocket_manager = WebSocketManager(socketio)
+failover_manager = FailoverManager(shard_lookup, node_registry, event_logger, replication_manager, failover_config, websocket_manager)
+health_monitor = NodeHealthMonitor(shard_lookup, node_registry, failover_config, websocket_manager)
 
 # Auto-start health monitoring
 health_monitor.start()
@@ -369,4 +373,4 @@ def get_failover_logs():
     return jsonify(event_logger.get_recent_events(limit)), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5000)
