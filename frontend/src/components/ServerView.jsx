@@ -30,8 +30,8 @@ const ServerView = ({ serversData }) => {
   };
 
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const [shardsRes, statusRes] = await Promise.all([
         axios.get('http://localhost:5000/shards').catch(e => ({ data: {} })),
@@ -42,7 +42,7 @@ const ServerView = ({ serversData }) => {
     } catch (err) {
       console.error("Failed to fetch data:", err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -65,13 +65,13 @@ const ServerView = ({ serversData }) => {
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(true);
   }, [serversData]); 
 
   // Add an interval to refresh the shard contents periodically
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchData();
+      fetchData(false);
     }, 5000);
     return () => clearInterval(interval);
   }, []);

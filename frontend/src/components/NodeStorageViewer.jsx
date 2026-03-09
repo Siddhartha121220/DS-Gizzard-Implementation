@@ -16,7 +16,7 @@ export default function NodeStorageViewer() {
       try {
         const response = await fetch('http://localhost:5000/hash-ring');
         if (!response.ok) throw new Error('Failed to fetch nodes');
-        
+
         const data = await response.json();
         const uniqueNodes = [...new Set(data.nodes.map(n => n.shard))];
         setNodes(uniqueNodes);
@@ -38,15 +38,12 @@ export default function NodeStorageViewer() {
       if (!selectedNode) return;
 
       try {
-        setLoading(true);
-        setError(null);
-        
         const response = await fetch('http://localhost:5000/shards');
         if (!response.ok) throw new Error('Failed to fetch shards');
-        
+
         const data = await response.json();
         setAllShards(data);
-        
+
         if (data[selectedNode] && data[selectedNode].tweets) {
           setTweets(data[selectedNode].tweets);
         } else {
@@ -56,12 +53,12 @@ export default function NodeStorageViewer() {
         console.error('Error fetching tweets:', err);
         setError(err.message);
         setTweets([]);
-      } finally {
-        setLoading(false);
       }
     };
 
-    fetchTweets();
+    setLoading(true);
+    fetchTweets().finally(() => setLoading(false));
+    
     const interval = setInterval(fetchTweets, 3000);
     return () => clearInterval(interval);
   }, [selectedNode]);
@@ -143,11 +140,10 @@ export default function NodeStorageViewer() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === f
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === f
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+              }`}
           >
             {f === 'all' ? 'All' : f === 'primary' ? 'Primary' : 'Replica'}
           </button>
@@ -200,11 +196,10 @@ export default function NodeStorageViewer() {
                     </td>
                     <td className="px-4 py-3 text-center text-sm">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          tweet.is_replica
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${tweet.is_replica
                             ? 'bg-purple-100 text-purple-800'
                             : 'bg-green-100 text-green-800'
-                        }`}
+                          }`}
                       >
                         {tweet.is_replica ? 'Replica' : 'Primary'}
                       </span>

@@ -106,6 +106,7 @@ const ClusterHealthGraph = () => {
   };
 
   const barOptions = {
+    animation: false,
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -128,6 +129,7 @@ const ClusterHealthGraph = () => {
   };
 
   const lineOptions = {
+    animation: false,
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
