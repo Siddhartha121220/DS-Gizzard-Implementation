@@ -10,10 +10,9 @@ export default function ReplicationDashboard() {
   useEffect(() => {
     const fetchReplicationData = async () => {
       try {
-        setLoading(true);
         const response = await fetch('http://localhost:5000/replication/map');
         if (!response.ok) throw new Error('Failed to fetch replication data');
-        
+
         const data = await response.json();
         setReplicationMap(data.replication_map || []);
         setStats(data.stats || null);
@@ -21,15 +20,12 @@ export default function ReplicationDashboard() {
       } catch (err) {
         console.error('Error fetching replication data:', err);
         setError(err.message);
-      } finally {
-        setLoading(false);
       }
     };
 
-    // Initial fetch
-    fetchReplicationData();
+    setLoading(true);
+    fetchReplicationData().finally(() => setLoading(false));
 
-    // Poll every 3 seconds
     const interval = setInterval(fetchReplicationData, 3000);
     return () => clearInterval(interval);
   }, []);

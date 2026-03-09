@@ -58,6 +58,21 @@ class TweetServiceHandler:
         import json
         return json.dumps(list(self.tweets.values()))
 
+    def heartbeat(self):
+        """
+        Health check endpoint that returns node status.
+        
+        Returns:
+            JSON string with status, timestamp, and node_id
+        """
+        import json
+        from datetime import datetime
+        return json.dumps({
+            "status": "alive",
+            "timestamp": datetime.now().isoformat(),
+            "node_id": self.node_id
+        })
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, required=True, help="Port to listen on")

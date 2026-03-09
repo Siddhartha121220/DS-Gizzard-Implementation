@@ -66,7 +66,7 @@ const HashRingView = ({ ringData, logs }) => {
     <div className="bg-white p-6 rounded-xl shadow-md flex flex-col items-center">
       <h2 className="text-xl font-semibold mb-4 text-gray-800">Cluster Nodes (Consistent Hash Ring)</h2>
       <div className="w-full max-w-sm">
-        <PolarArea data={chartData} options={{ responsive: true, maintainAspectRatio: true }} />
+        <PolarArea data={chartData} options={{ responsive: true, maintainAspectRatio: true, animation: false }} />
       </div>
       <div className="mt-4 text-sm text-gray-500 text-center">
         Shows the distribution of virtual nodes across the physical storage shards on the SHA256 ring.

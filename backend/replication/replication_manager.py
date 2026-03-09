@@ -7,8 +7,8 @@ import json
 from datetime import datetime
 from thrift.transport import TSocket, TTransport
 from thrift.protocol import TBinaryProtocol
-from tweet import TweetService
-from replica_selector import ReplicaSelector
+from router_service import TweetService
+from .replica_selector import ReplicaSelector
 
 
 class ReplicationManager:

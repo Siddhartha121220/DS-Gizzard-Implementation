@@ -14,22 +14,20 @@ export default function ReplicaGraph() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        setLoading(true);
         const response = await fetch('http://localhost:5000/replication/map');
         if (!response.ok) throw new Error('Failed to fetch replication stats');
-        
+
         const data = await response.json();
         setStats(data.stats || null);
         setError(null);
       } catch (err) {
         console.error('Error fetching stats:', err);
         setError(err.message);
-      } finally {
-        setLoading(false);
       }
     };
 
-    fetchStats();
+    setLoading(true);
+    fetchStats().finally(() => setLoading(false));
     const interval = setInterval(fetchStats, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -54,7 +52,7 @@ export default function ReplicaGraph() {
   const nodeLabels = Object.keys(stats.by_node || {});
   const primaryCounts = nodeLabels.map(node => stats.by_node[node].primary || 0);
   const replicaCounts = nodeLabels.map(node => stats.by_node[node].replica || 0);
-  const totalCounts = nodeLabels.map(node => 
+  const totalCounts = nodeLabels.map(node =>
     (stats.by_node[node].primary || 0) + (stats.by_node[node].replica || 0)
   );
 
@@ -96,6 +94,7 @@ export default function ReplicaGraph() {
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
     plugins: {
       legend: {
         position: 'bottom',
@@ -122,21 +121,19 @@ export default function ReplicaGraph() {
         <div className="flex gap-2">
           <button
             onClick={() => setChartType('pie')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              chartType === 'pie'
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${chartType === 'pie'
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+              }`}
           >
             Pie Chart
           </button>
           <button
             onClick={() => setChartType('bar')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              chartType === 'bar'
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${chartType === 'bar'
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+              }`}
           >
             Bar Chart
           </button>
