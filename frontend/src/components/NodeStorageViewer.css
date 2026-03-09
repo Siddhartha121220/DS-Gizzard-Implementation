@@ -1,0 +1,26 @@
+.node-storage-viewer {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
+
+.node-storage-viewer select {
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.node-storage-viewer select:hover {
+  border-color: #93c5fd;
+}
+
+.node-storage-viewer table {
+  border-collapse: collapse;
+}
+
+.node-storage-viewer tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.node-storage-viewer tbody tr:hover {
+  background-color: #f3f4f6;
+}

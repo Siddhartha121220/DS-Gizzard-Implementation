@@ -11,6 +11,7 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 
 from router.consistent_hash import ConsistentHashRing
+from replication.replication_manager import ReplicationManager
 
 sys.path.append('gen-py')
 from router_service import TweetService
@@ -51,6 +52,9 @@ for server_name, server_data in servers_info.items():
             "server": server_name
         }
         hash_ring.add_node(shard_name)
+
+# Initialize Replication Manager
+replication_manager = ReplicationManager(hash_ring, shard_lookup)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -97,12 +101,18 @@ def store_tweet():
         server_name = shard_lookup[selected_node]["server"]
         logging.info(f"TweetID {tweet_id} (Hash: {hash_value}) -> {selected_node} on {server_name}")
         
+        # Trigger replication to secondary node
+        replication_result = replication_manager.replicate_write(
+            tweet_id, user_id, text, selected_node
+        )
+        
         return jsonify({
             "message": "Tweet stored successfully",
             "node": selected_node,
             "server": server_name,
             "tweet_id": tweet_id,
-            "hash_value": str(hash_value)
+            "hash_value": str(hash_value),
+            "replication": replication_result
         }), 201
     except Exception as e:
         import traceback
@@ -246,6 +256,50 @@ def rename_server(server_name):
             shard_info["server"] = new_name
             
     return jsonify({"message": f"Server renamed to {new_name}"}), 200
+
+@app.route('/replication/status', methods=['GET'])
+def get_replication_status():
+    """Fetch replication status for all tweets."""
+    replication_map = replication_manager.get_replication_map()
+    stats = replication_manager.get_replication_stats()
+    
+    return jsonify({
+        "tweets": replication_map,
+        "stats": stats
+    }), 200
+
+@app.route('/replication/status/<tweet_id>', methods=['GET'])
+def get_tweet_replication_status(tweet_id):
+    """Fetch replication status for a specific tweet."""
+    status = replication_manager.get_replication_status(tweet_id)
+    
+    if not status:
+        return jsonify({"error": f"Tweet {tweet_id} not found"}), 404
+    
+    return jsonify(status), 200
+
+@app.route('/replication/map', methods=['GET'])
+def get_replication_map():
+    """Fetch the complete replication mapping for the dashboard."""
+    replication_map = replication_manager.get_replication_map()
+    
+    # Format for frontend consumption
+    formatted_map = []
+    for rep in replication_map:
+        formatted_map.append({
+            "tweet_id": rep['tweet_id'],
+            "primary_node": rep['primary_node'],
+            "replica_node": rep['replica_node'],
+            "timestamp": rep['timestamp'],
+            "status": rep['status'],
+            "primary_server": shard_lookup.get(rep['primary_node'], {}).get('server', 'Unknown'),
+            "replica_server": shard_lookup.get(rep['replica_node'], {}).get('server', 'Unknown') if rep['replica_node'] else 'N/A'
+        })
+    
+    return jsonify({
+        "replication_map": formatted_map,
+        "stats": replication_manager.get_replication_stats()
+    }), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
