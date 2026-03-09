@@ -1,15 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import useWebSocket from '../hooks/useWebSocket';
 
 const FailoverEventLog = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { failoverEvents } = useWebSocket();
 
   useEffect(() => {
     fetchEvents();
-    const interval = setInterval(fetchEvents, 5000);
+    const interval = setInterval(fetchEvents, 10000); // Reduced frequency since WebSocket provides real-time updates
     return () => clearInterval(interval);
   }, []);
+
+  // Prepend new WebSocket events to existing events
+  useEffect(() => {
+    if (failoverEvents.length > 0) {
+      setEvents(prev => {
+        const newEvents = [...failoverEvents, ...prev];
+        // Remove duplicates based on timestamp
+        const uniqueEvents = newEvents.filter((event, index, self) =>
+          index === self.findIndex(e => e.timestamp === event.timestamp)
+        );
+        return uniqueEvents.slice(0, 50);
+      });
+    }
+  }, [failoverEvents]);
 
   const fetchEvents = async () => {
     try {

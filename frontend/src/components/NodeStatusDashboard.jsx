@@ -1,15 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import useWebSocket from '../hooks/useWebSocket';
 
 const NodeStatusDashboard = () => {
   const [healthInfo, setHealthInfo] = useState({});
   const [loading, setLoading] = useState(true);
+  const { nodeStatus, connected } = useWebSocket();
 
   useEffect(() => {
     fetchHealthInfo();
-    const interval = setInterval(fetchHealthInfo, 3000);
+    const interval = setInterval(fetchHealthInfo, 10000); // Reduced frequency since WebSocket provides real-time updates
     return () => clearInterval(interval);
   }, []);
+
+  // Update health info when WebSocket status changes
+  useEffect(() => {
+    if (Object.keys(nodeStatus).length > 0) {
+      fetchHealthInfo();
+    }
+  }, [nodeStatus]);
 
   const fetchHealthInfo = async () => {
     try {
@@ -52,7 +61,13 @@ const NodeStatusDashboard = () => {
 
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">Node Health Status</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold text-gray-800">Node Health Status</h2>
+        <div className="flex items-center">
+          <div className={`w-3 h-3 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'} mr-2`}></div>
+          <span className="text-sm text-gray-600">{connected ? 'Connected' : 'Disconnected'}</span>
+        </div>
+      </div>
       
       {Object.keys(healthInfo).length === 0 ? (
         <p className="text-gray-500">No nodes available</p>
