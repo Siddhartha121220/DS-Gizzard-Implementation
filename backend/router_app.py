@@ -450,5 +450,5 @@ def get_failover_logs():
 
 if __name__ == '__main__':
     # Default to localhost to avoid sandboxed bind restrictions.
-    host = os.environ.get('ROUTER_HOST', '127.0.0.1')
+    host = os.environ.get('ROUTER_HOST', '0.0.0.0')
     socketio.run(app, host=host, port=5000)
