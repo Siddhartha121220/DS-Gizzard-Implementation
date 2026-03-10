@@ -15,8 +15,11 @@ def start_services():
     # Start storage nodes (now handled dynamically by router_app.py via UI)
     python_exec = sys.executable
         
+    env = os.environ.copy()
+    env["PYTHONPATH"] = "gen-py" + (os.pathsep + env["PYTHONPATH"] if "PYTHONPATH" in env else "")
+
     print("Starting router service on port 5000...")
-    p_router = subprocess.Popen([python_exec, "router_app.py"])
+    p_router = subprocess.Popen([python_exec, "router_app.py"], env=env)
     processes.append(p_router)
     
     try:
