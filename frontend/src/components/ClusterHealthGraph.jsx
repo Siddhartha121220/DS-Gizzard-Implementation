@@ -37,8 +37,8 @@ const ClusterHealthGraph = () => {
   const fetchData = async () => {
     try {
       const [statusRes, eventsRes] = await Promise.all([
-        axios.get(`http://${window.location.hostname}:5000/nodes/status`),
-        axios.get(`http://${window.location.hostname}:5000/failover/logs?limit=100`)
+        axios.get(`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000/nodes/status`),
+        axios.get(`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000/failover/logs?limit=100`)
       ]);
       setNodeStatus(statusRes.data);
       setFailoverEvents(eventsRes.data);

@@ -23,7 +23,7 @@ function App() {
 
   const fetchRingData = async () => {
     try {
-      const res = await axios.get(`http://${window.location.hostname}:5000/hash-ring`);
+      const res = await axios.get(`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000/hash-ring`);
       setRingData(res.data);
     } catch (err) {
       console.error("Failed to fetch hash ring data:", err);

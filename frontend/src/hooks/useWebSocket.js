@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 
-const useWebSocket = (url = `http://${window.location.hostname}:5000`) => {
+const useWebSocket = (url = `http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000`) => {
   const [nodeStatus, setNodeStatus] = useState({});
   const [failoverEvents, setFailoverEvents] = useState([]);
   const [connected, setConnected] = useState(false);

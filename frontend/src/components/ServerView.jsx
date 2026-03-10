@@ -14,7 +14,7 @@ const ServerView = ({ serversData }) => {
       return;
     }
     try {
-      await axios.post(`http://localhost:5000/servers/${oldName}/rename`, { new_name: newServerName });
+      await axios.post(`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000/servers/${oldName}/rename`, { new_name: newServerName });
       setEditingServer(null);
       window.location.reload(); 
     } catch (err) {
@@ -34,8 +34,8 @@ const ServerView = ({ serversData }) => {
     if (showLoading) setLoading(true);
     try {
       const [shardsRes, statusRes] = await Promise.all([
-        axios.get(`http://${window.location.hostname}:5000/shards`).catch(e => ({ data: {} })),
-        axios.get(`http://${window.location.hostname}:5000/servers/status`).catch(e => ({ data: {} }))
+        axios.get(`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000/shards`).catch(e => ({ data: {} })),
+        axios.get(`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000/servers/status`).catch(e => ({ data: {} }))
       ]);
       setShardContents(shardsRes.data);
       setServerStatus(statusRes.data);
@@ -48,7 +48,7 @@ const ServerView = ({ serversData }) => {
 
   const startServer = async (serverName) => {
     try {
-      await axios.post(`http://localhost:5000/servers/${serverName}/start`);
+      await axios.post(`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000/servers/${serverName}/start`);
       fetchData();
     } catch (err) {
       console.error("Failed to start server:", err);
@@ -57,7 +57,7 @@ const ServerView = ({ serversData }) => {
 
   const stopServer = async (serverName) => {
     try {
-      await axios.post(`http://localhost:5000/servers/${serverName}/stop`);
+      await axios.post(`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000/servers/${serverName}/stop`);
       fetchData();
     } catch (err) {
       console.error("Failed to stop server:", err);

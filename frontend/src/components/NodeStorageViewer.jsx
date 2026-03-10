@@ -14,7 +14,7 @@ export default function NodeStorageViewer() {
   useEffect(() => {
     const fetchNodes = async () => {
       try {
-        const response = await fetch(`http://${window.location.hostname}:5000/hash-ring`);
+        const response = await fetch(`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000/hash-ring`);
         if (!response.ok) throw new Error('Failed to fetch nodes');
 
         const data = await response.json();
@@ -38,7 +38,7 @@ export default function NodeStorageViewer() {
       if (!selectedNode) return;
 
       try {
-        const response = await fetch(`http://${window.location.hostname}:5000/shards`);
+        const response = await fetch(`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000/shards`);
         if (!response.ok) throw new Error('Failed to fetch shards');
 
         const data = await response.json();
