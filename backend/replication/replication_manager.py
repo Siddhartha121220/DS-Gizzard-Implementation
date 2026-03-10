@@ -57,10 +57,20 @@ class ReplicationManager:
                 'message': status message
             }
         """
-        # Get replica node
-        replica_node = self.replica_selector.get_replica_node(primary_node)
-        
-        if not replica_node:
+        # Get all possible fallback nodes
+        fallback_nodes = []
+        try:
+            physical_nodes = self.replica_selector.physical_nodes
+            primary_index = physical_nodes.index(primary_node)
+            for i in range(1, len(physical_nodes)):
+                replica_index = (primary_index + i) % len(physical_nodes)
+                fallback_nodes.append(physical_nodes[replica_index])
+        except ValueError:
+            pass
+
+        if not fallback_nodes:
+            import logging
+            logging.error(f"[Replication] No replica nodes available for {primary_node}")
             return {
                 'tweet_id': tweet_id,
                 'primary_node': primary_node,
@@ -69,56 +79,56 @@ class ReplicationManager:
                 'message': 'Could not determine replica node'
             }
 
-        # Store replication metadata
-        replication_info = {
-            'tweet_id': tweet_id,
-            'primary_node': primary_node,
-            'replica_node': replica_node,
-            'timestamp': datetime.now().isoformat(),
-            'status': 'pending'
-        }
-        self.replication_map[tweet_id] = replication_info
-
-        # Send replication request to replica node
-        try:
-            success = self._send_replica_write(
-                tweet_id, user_id, text, replica_node
-            )
-            
-            if success:
-                replication_info['status'] = 'success'
-                self.replica_data[tweet_id] = {
-                    'user_id': user_id,
-                    'text': text,
-                    'primary_node': primary_node,
-                    'replica_node': replica_node,
-                    'timestamp': replication_info['timestamp']
-                }
-                return {
-                    'tweet_id': tweet_id,
-                    'primary_node': primary_node,
-                    'replica_node': replica_node,
-                    'status': 'success',
-                    'message': f'Tweet replicated to {replica_node}'
-                }
-            else:
-                replication_info['status'] = 'failed'
-                return {
-                    'tweet_id': tweet_id,
-                    'primary_node': primary_node,
-                    'replica_node': replica_node,
-                    'status': 'failed',
-                    'message': f'Failed to replicate to {replica_node}'
-                }
-        except Exception as e:
-            replication_info['status'] = 'failed'
-            return {
+        last_error = "Unknown error"
+        for replica_node in fallback_nodes:
+            # Store replication metadata
+            replication_info = {
                 'tweet_id': tweet_id,
                 'primary_node': primary_node,
                 'replica_node': replica_node,
-                'status': 'failed',
-                'message': f'Replication error: {str(e)}'
+                'timestamp': datetime.now().isoformat(),
+                'status': 'pending'
             }
+            self.replication_map[tweet_id] = replication_info
+
+            # Send replication request to replica node
+            try:
+                success = self._send_replica_write(
+                    tweet_id, user_id, text, replica_node
+                )
+                
+                if success:
+                    replication_info['status'] = 'success'
+                    self.replica_data[tweet_id] = {
+                        'user_id': user_id,
+                        'text': text,
+                        'primary_node': primary_node,
+                        'replica_node': replica_node,
+                        'timestamp': replication_info['timestamp']
+                    }
+                    return {
+                        'tweet_id': tweet_id,
+                        'primary_node': primary_node,
+                        'replica_node': replica_node,
+                        'status': 'success',
+                        'message': f'Tweet replicated to {replica_node}'
+                    }
+                else:
+                    replication_info['status'] = 'failed'
+                    last_error = f"Thrift call to {replica_node} returned False"
+                    continue # Try next replica
+            except Exception as e:
+                replication_info['status'] = 'failed'
+                last_error = f"Replication error for {replica_node}: {e}"
+                continue
+
+        return {
+            'tweet_id': tweet_id,
+            'primary_node': primary_node,
+            'replica_node': None,
+            'status': 'failed',
+            'message': f'Failed to replicate to any node. Last error: {last_error}'
+        }
 
     def _send_replica_write(self, tweet_id, user_id, text, replica_node):
         """
