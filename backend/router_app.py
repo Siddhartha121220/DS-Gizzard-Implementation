@@ -3,6 +3,8 @@ import sys
 import json
 import logging
 import subprocess
+import urllib.request
+import urllib.error
 import socket
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -40,10 +42,20 @@ except FileNotFoundError:
 hash_ring = ConsistentHashRing(replicas=3)
 servers_info = config.get("servers", {})
 
-# Dynamically map the first simulated server ('Laptop1') to the actual machine's hostname
+# Determine which server name is local to this machine.
+# For multi-host setups, set LOCAL_SERVER_NAME (e.g., Laptop1/Laptop2/Laptop3) on each machine.
 local_hostname = socket.gethostname()
-if "Laptop1" in servers_info:
+local_server_name = os.environ.get("LOCAL_SERVER_NAME")
+if local_server_name and local_server_name not in servers_info:
+    local_server_name = None
+
+# Back-compat: if LOCAL_SERVER_NAME is not set, map the first simulated server to this host.
+if not local_server_name and "Laptop1" in servers_info:
     servers_info[local_hostname] = servers_info.pop("Laptop1")
+    local_server_name = local_hostname
+
+if not local_server_name and local_hostname in servers_info:
+    local_server_name = local_hostname
 
 # Flatten info for easy lookup: { 'Shard1': { 'host': ..., 'port': ..., 'server': 'Laptop1' } }
 shard_lookup = {}
@@ -89,6 +101,49 @@ def get_thrift_client(shard_name):
     client = TweetService.Client(protocol)
     
     return client, transport
+
+def get_remote_server_host(server_name):
+    server = servers_info.get(server_name, {})
+    shards = server.get("shards", {})
+    for shard in shards.values():
+        return shard.get("host")
+    return None
+
+def get_remote_server_status(server_name):
+    host = get_remote_server_host(server_name)
+    if not host:
+        return "down"
+    url = f"http://{host}:5000/servers/{server_name}/status"
+    try:
+        with urllib.request.urlopen(url, timeout=2) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return data.get("status", "down")
+    except Exception:
+        return "down"
+
+def proxy_remote_server_action(server_name, action):
+    host = get_remote_server_host(server_name)
+    if not host:
+        return jsonify({"error": "Unknown server host"}), 500
+    url = f"http://{host}:5000/servers/{server_name}/{action}"
+    try:
+        req = urllib.request.Request(
+            url,
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return jsonify(data), 200
+    except urllib.error.HTTPError as e:
+        try:
+            err_data = json.loads(e.read().decode("utf-8"))
+        except Exception:
+            err_data = {"error": "Remote error", "detail": str(e)}
+        return jsonify(err_data), e.code
+    except Exception as e:
+        return jsonify({"error": "Remote unreachable", "detail": str(e)}), 502
 
 @app.route('/tweet', methods=['POST'])
 def store_tweet():
@@ -248,17 +303,34 @@ def get_shards():
 def get_servers_status():
     status = {}
     for server_name in servers_info.keys():
+        # Remote status
+        if local_server_name and server_name != local_server_name:
+            remote_status = get_remote_server_status(server_name)
+            status[server_name] = remote_status
+            continue
+
+        # Local status
         procs = server_processes.get(server_name, [])
-        is_up = False
-        if procs and all(p.poll() is None for p in procs):
-            is_up = True
+        is_up = bool(procs) and all(p.poll() is None for p in procs)
         status[server_name] = "up" if is_up else "down"
     return jsonify(status), 200
+
+@app.route('/servers/<server_name>/status', methods=['GET'])
+def get_server_status(server_name):
+    if server_name not in servers_info:
+        return jsonify({"error": "Unknown server"}), 404
+    procs = server_processes.get(server_name, [])
+    is_up = bool(procs) and all(p.poll() is None for p in procs)
+    return jsonify({"status": "up" if is_up else "down"}), 200
 
 @app.route('/servers/<server_name>/start', methods=['POST'])
 def start_server(server_name):
     if server_name not in servers_info:
         return jsonify({"error": "Unknown server"}), 404
+
+    # Proxy to remote backend if this server is not local.
+    if local_server_name and server_name != local_server_name:
+        return proxy_remote_server_action(server_name, "start")
         
     procs = server_processes.get(server_name, [])
     if procs and all(p.poll() is None for p in procs):
@@ -277,6 +349,10 @@ def start_server(server_name):
 def stop_server(server_name):
     if server_name not in servers_info:
         return jsonify({"error": "Unknown server"}), 404
+
+    # Proxy to remote backend if this server is not local.
+    if local_server_name and server_name != local_server_name:
+        return proxy_remote_server_action(server_name, "stop")
         
     procs = server_processes.get(server_name, [])
     for p in procs:
@@ -373,4 +449,6 @@ def get_failover_logs():
     return jsonify(event_logger.get_recent_events(limit)), 200
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000)
+    # Default to localhost to avoid sandboxed bind restrictions.
+    host = os.environ.get('ROUTER_HOST', '127.0.0.1')
+    socketio.run(app, host=host, port=5000)
