@@ -22,7 +22,6 @@ from failover.event_logger import EventLogger
 from failover.failover_manager import FailoverManager
 from failover.websocket_manager import WebSocketManager
 
-sys.path.append('gen-py')
 from router_service import TweetService
 from router_service.ttypes import *
 
@@ -169,7 +168,7 @@ def store_tweet():
         
     try:
         transport.open()
-        success = client.storeTweet(tweet_id, user_id, text)
+        success = client.storeTweet(tweet_id, user_id, text, False)
         transport.close()
         
         server_name = shard_lookup[selected_node]["server"]

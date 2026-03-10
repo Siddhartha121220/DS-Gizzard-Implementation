@@ -11,7 +11,6 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 
 # Import generated thrift files
-sys.path.append('gen-py')
 from router_service import TweetService
 from router_service.ttypes import *
 

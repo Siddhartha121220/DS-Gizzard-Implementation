@@ -253,7 +253,7 @@ class FailoverManager:
         
         try:
             transport.open()
-            success = client.storeTweet(tweet_id, user_id, text)
+            success = client.storeTweet(tweet_id, user_id, text, False)
             transport.close()
             return success
         except Exception as e:

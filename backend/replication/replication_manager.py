@@ -149,15 +149,21 @@ class ReplicationManager:
 
             transport.open()
             try:
-                # Call storeTweet with is_replica flag
-                result = client.storeTweet(tweet_id, user_id, text)
+                # Call storeTweet
+                result = client.storeTweet(tweet_id, user_id, text, True)
                 transport.close()
                 return result
             except Exception as e:
+                import logging
+                logging.error(f"Thrift application exception during replicate write to {replica_node}: {e}")
                 transport.close()
                 return False
 
         except Exception as e:
+            import logging
+            logging.error(f"Thrift transport/connection exception during replicate write to {replica_node} (host={host}, port={port}): {e}")
+            import traceback
+            logging.error(traceback.format_exc())
             return False
 
     def get_replication_status(self, tweet_id):
