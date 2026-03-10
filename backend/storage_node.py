@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     handler = TweetServiceHandler(args.name)
     processor = TweetService.Processor(handler)
-    transport = TSocket.TServerSocket(host='127.0.0.1', port=args.port)
+    transport = TSocket.TServerSocket(host='0.0.0.0', port=args.port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 

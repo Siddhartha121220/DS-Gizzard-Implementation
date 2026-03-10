@@ -34,8 +34,8 @@ const ServerView = ({ serversData }) => {
     if (showLoading) setLoading(true);
     try {
       const [shardsRes, statusRes] = await Promise.all([
-        axios.get('http://localhost:5000/shards').catch(e => ({ data: {} })),
-        axios.get('http://localhost:5000/servers/status').catch(e => ({ data: {} }))
+        axios.get(`http://${window.location.hostname}:5000/shards`).catch(e => ({ data: {} })),
+        axios.get(`http://${window.location.hostname}:5000/servers/status`).catch(e => ({ data: {} }))
       ]);
       setShardContents(shardsRes.data);
       setServerStatus(statusRes.data);

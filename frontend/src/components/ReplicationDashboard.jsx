@@ -10,7 +10,7 @@ export default function ReplicationDashboard() {
   useEffect(() => {
     const fetchReplicationData = async () => {
       try {
-        const response = await fetch('http://localhost:5000/replication/map');
+        const response = await fetch(`http://${window.location.hostname}:5000/replication/map`);
         if (!response.ok) throw new Error('Failed to fetch replication data');
 
         const data = await response.json();

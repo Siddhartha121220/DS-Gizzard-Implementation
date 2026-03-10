@@ -14,7 +14,7 @@ const TweetForm = ({ onTweetRouted }) => {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/tweet', {
+      const response = await axios.post(`http://${window.location.hostname}:5000/tweet`, {
         tweet_id: tweetId,
         user_id: userId,
         text: text

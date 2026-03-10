@@ -29,7 +29,7 @@ const FailoverEventLog = () => {
 
   const fetchEvents = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/failover/logs?limit=50');
+      const res = await axios.get(`http://${window.location.hostname}:5000/failover/logs?limit=50`);
       setEvents(res.data);
       setLoading(false);
     } catch (err) {

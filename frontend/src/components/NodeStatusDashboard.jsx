@@ -22,7 +22,7 @@ const NodeStatusDashboard = () => {
 
   const fetchHealthInfo = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/nodes/health');
+      const res = await axios.get(`http://${window.location.hostname}:5000/nodes/health`);
       setHealthInfo(res.data);
       setLoading(false);
     } catch (err) {

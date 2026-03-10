@@ -14,7 +14,7 @@ export default function ReplicaGraph() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('http://localhost:5000/replication/map');
+        const response = await fetch(`http://${window.location.hostname}:5000/replication/map`);
         if (!response.ok) throw new Error('Failed to fetch replication stats');
 
         const data = await response.json();
