@@ -7,6 +7,9 @@ import json
 from datetime import datetime
 from thrift.transport import TSocket, TTransport
 from thrift.protocol import TBinaryProtocol
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'gen-py'))
 from router_service import TweetService
 from .replica_selector import ReplicaSelector
 
