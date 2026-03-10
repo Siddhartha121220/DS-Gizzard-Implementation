@@ -9,7 +9,7 @@ from thrift.transport import TSocket, TTransport
 from thrift.protocol import TBinaryProtocol
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'gen-py'))
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from router_service import TweetService
 from .replica_selector import ReplicaSelector
 

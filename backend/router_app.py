@@ -50,9 +50,9 @@ if local_server_name and local_server_name not in servers_info:
     local_server_name = None
 
 # Back-compat: if LOCAL_SERVER_NAME is not set, map the first simulated server to this host.
-if not local_server_name and "Laptop1" in servers_info:
-    servers_info[local_hostname] = servers_info.pop("Laptop1")
-    local_server_name = local_hostname
+# local_hostname = socket.gethostname()
+# if "Laptop1" in servers_info:
+#     servers_info[local_hostname] = servers_info.pop("Laptop1")
 
 if not local_server_name and local_hostname in servers_info:
     local_server_name = local_hostname

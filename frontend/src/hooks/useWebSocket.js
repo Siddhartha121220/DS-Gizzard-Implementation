@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 
-const useWebSocket = (url = `http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:5000`) => {
+const defaultUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5000`;
+const useWebSocket = (url = defaultUrl) => {
   const [nodeStatus, setNodeStatus] = useState({});
   const [failoverEvents, setFailoverEvents] = useState([]);
   const [connected, setConnected] = useState(false);
