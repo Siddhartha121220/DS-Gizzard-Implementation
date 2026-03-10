@@ -10,9 +10,11 @@ def find_thrift_compiler():
     env_bin = os.environ.get("THRIFT_BIN")
     if env_bin:
         return env_bin
-    local_thrift = os.path.join(os.path.dirname(__file__), "thrift.exe")
-    if os.path.exists(local_thrift):
-        return local_thrift
+    # Only use the bundled thrift.exe on Windows.
+    if os.name == "nt":
+        local_thrift = os.path.join(os.path.dirname(__file__), "thrift.exe")
+        if os.path.exists(local_thrift):
+            return local_thrift
     return shutil.which("thrift")
 
 def generate_thrift():
