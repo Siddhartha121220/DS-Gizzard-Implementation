@@ -78,10 +78,11 @@ replication_manager = ReplicationManager(hash_ring, shard_lookup)
 # Initialize Failover System
 failover_config = FailoverConfig()
 node_registry = NodeRegistry(recovery_threshold=failover_config.RECOVERY_THRESHOLD)
-event_logger = EventLogger(failover_config.FAILOVER_LOG_FILE, failover_config.MAX_MEMORY_EVENTS)
+log_path = os.path.abspath(failover_config.FAILOVER_LOG_FILE)
+event_logger = EventLogger(log_path, failover_config.MAX_MEMORY_EVENTS)
 websocket_manager = WebSocketManager(socketio)
 failover_manager = FailoverManager(shard_lookup, node_registry, event_logger, replication_manager, failover_config, websocket_manager)
-health_monitor = NodeHealthMonitor(shard_lookup, node_registry, failover_config, websocket_manager)
+health_monitor = NodeHealthMonitor(shard_lookup, node_registry, event_logger, failover_config, websocket_manager)
 
 # Auto-start health monitoring
 health_monitor.start()

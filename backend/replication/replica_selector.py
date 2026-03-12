@@ -20,7 +20,8 @@ class ReplicaSelector:
         self.shard_lookup = shard_lookup
         self.ring_state = hash_ring.get_ring_state()
         self.nodes = self.ring_state.get('nodes', [])
-        # Ordered list of physical shard names as they appear in the ring
+        # Ordered list of physical shard names
+        self.physical_nodes = self.nodes
         self.ring_order = self.nodes
 
     def _get_node_host(self, shard_name):

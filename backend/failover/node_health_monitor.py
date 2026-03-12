@@ -17,18 +17,20 @@ from router_service import TweetService
 class NodeHealthMonitor:
     """Background health monitoring service with periodic heartbeat checks."""
     
-    def __init__(self, shard_lookup, node_registry, config, websocket_manager=None):
+    def __init__(self, shard_lookup, node_registry, event_logger, config, websocket_manager=None):
         """
         Initialize health monitor.
         
         Args:
             shard_lookup: Dict mapping shard names to {host, port, server} info
             node_registry: NodeRegistry instance for status tracking
+            event_logger: EventLogger instance for failover logging
             config: FailoverConfig instance
             websocket_manager: Optional WebSocketManager for real-time updates
         """
         self.shard_lookup = shard_lookup
         self.node_registry = node_registry
+        self.event_logger = event_logger
         self.config = config
         self.websocket_manager = websocket_manager
         self.running = False
@@ -47,6 +49,12 @@ class NodeHealthMonitor:
         self.running = True
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.monitor_thread.start()
+        
+        # Log startup event
+        self.event_logger.log_event(
+            "health_check", None, "system", None, "monitor_started",
+            "Node health monitoring background service started"
+        )
         logging.info("Health monitoring started")
     
     def stop(self):
@@ -99,6 +107,14 @@ class NodeHealthMonitor:
                 self.node_registry.record_success(shard_name)
                 new_status = self.node_registry.get_status(shard_name)
                 
+                # Log event if status changed
+                if old_status != new_status:
+                    self.event_logger.log_event(
+                        "health_check", None, shard_name, None, 
+                        f"node_status_change_{new_status.value.lower()}",
+                        f"Node {shard_name} status changed from {old_status.value} to {new_status.value}"
+                    )
+                
                 # Emit WebSocket event if status changed
                 if self.websocket_manager and old_status != new_status:
                     health_info = self.node_registry.get_health_info(shard_name)
@@ -115,6 +131,13 @@ class NodeHealthMonitor:
             old_status = self.node_registry.get_status(shard_name)
             self.node_registry.record_failure(shard_name)
             new_status = self.node_registry.get_status(shard_name)
+            
+            # Log event if status changed to DOWN
+            if old_status != new_status and new_status.value == "DOWN":
+                self.event_logger.log_event(
+                    "health_check", None, shard_name, None, "node_down",
+                    f"Node {shard_name} marked as DOWN due to: {str(e)}"
+                )
             
             # Emit WebSocket event if status changed
             if self.websocket_manager and old_status != new_status:
