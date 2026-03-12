@@ -25,7 +25,7 @@ def generate_thrift():
 
     print("Generating Thrift Python bindings...")
     result = subprocess.run(
-        [thrift_bin, "--gen", "py", "tweet.thrift"],
+        [thrift_bin, "--gen", "py", "-out", ".", "tweet.thrift"],
         cwd=os.path.dirname(__file__),
     )
     if result.returncode != 0:
@@ -47,7 +47,6 @@ def start_services():
     python_exec = sys.executable
         
     env = os.environ.copy()
-    env["PYTHONPATH"] = "gen-py" + (os.pathsep + env["PYTHONPATH"] if "PYTHONPATH" in env else "")
 
     print("Starting router service on port 5000...")
     p_router = subprocess.Popen([python_exec, "router_app.py"], env=env)

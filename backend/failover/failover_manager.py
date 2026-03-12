@@ -52,12 +52,21 @@ class FailoverManager:
         """
         logging.warning(f"[Failover] Read failure on {primary_node} for tweet {tweet_id}: {exception}")
         
-        # Get replica node
-        replica_node = self.replication_manager.replica_selector.get_replica_node(primary_node)
-        if not replica_node:
+        # Get all possible fallback nodes
+        fallback_nodes = []
+        try:
+            physical_nodes = self.replication_manager.replica_selector.physical_nodes
+            primary_index = physical_nodes.index(primary_node)
+            for i in range(1, len(physical_nodes)):
+                replica_index = (primary_index + i) % len(physical_nodes)
+                fallback_nodes.append(physical_nodes[replica_index])
+        except ValueError:
+            pass
+            
+        if not fallback_nodes:
             self.event_logger.log_event(
                 "failover", tweet_id, primary_node, None, "read_failed_no_replica",
-                f"No replica available for {primary_node}"
+                f"No fallback nodes available for {primary_node}"
             )
             return {
                 "success": False,
@@ -81,49 +90,55 @@ class FailoverManager:
         except Exception as retry_exception:
             logging.warning(f"[Failover] Retry failed on {primary_node}: {retry_exception}")
         
-        # Failover to replica
-        logging.info(f"[Failover] Failing over read to replica {replica_node}")
-        try:
-            data = self._attempt_read(tweet_id, replica_node, self.config.REQUEST_TIMEOUT)
-            logging.info(f"[Failover] Read successful on replica {replica_node}")
-            
-            self.event_logger.log_event(
-                "failover", tweet_id, primary_node, replica_node, "read_failover",
-                f"Read redirected from {primary_node} to {replica_node}"
-            )
-            
-            # Emit WebSocket event
-            if self.websocket_manager:
-                self.websocket_manager.emit_failover_event({
-                    "timestamp": self.event_logger.memory_events[-1]["timestamp"],
-                    "event_type": "failover",
-                    "tweet_id": tweet_id,
-                    "primary_node": primary_node,
-                    "replica_node": replica_node,
-                    "action": "read_failover"
-                })
-            
-            return {
-                "success": True,
-                "data": data,
-                "node_used": replica_node,
-                "failover": True
-            }
-        except Exception as failover_exception:
-            logging.error(f"[Failover] Failover read failed on {replica_node}: {failover_exception}")
-            
-            self.event_logger.log_event(
-                "failover", tweet_id, primary_node, replica_node, "read_failover_failed",
-                f"Both primary and replica failed"
-            )
-            
-            return {
-                "success": False,
-                "data": None,
-                "node_used": replica_node,
-                "failover": True,
-                "error": str(failover_exception)
-            }
+        last_error = None
+        for replica_node in fallback_nodes:
+            # Failover to replica
+            logging.info(f"[Failover] Failing over read to fallback {replica_node}")
+            try:
+                data = self._attempt_read(tweet_id, replica_node, self.config.REQUEST_TIMEOUT)
+                logging.info(f"[Failover] Read successful on fallback {replica_node}")
+                
+                self.event_logger.log_event(
+                    "failover", tweet_id, primary_node, replica_node, "read_failover",
+                    f"Read redirected from {primary_node} to {replica_node}"
+                )
+                
+                # Emit WebSocket event
+                if self.websocket_manager:
+                    self.websocket_manager.emit_failover_event({
+                        "timestamp": self.event_logger.memory_events[-1]["timestamp"],
+                        "event_type": "failover",
+                        "tweet_id": tweet_id,
+                        "primary_node": primary_node,
+                        "replica_node": replica_node,
+                        "action": "read_failover"
+                    })
+                
+                return {
+                    "success": True,
+                    "data": data,
+                    "node_used": replica_node,
+                    "failover": True
+                }
+            except Exception as failover_exception:
+                logging.warning(f"[Failover] Failover read failed on {replica_node}: {failover_exception}")
+                last_error = failover_exception
+                continue
+
+        # If all fallbacks failed
+        logging.error(f"[Failover] All fallback reads failed for primary {primary_node}. Last error: {last_error}")
+        self.event_logger.log_event(
+            "failover", tweet_id, primary_node, None, "read_failover_failed",
+            f"Read failed on primary and all fallbacks"
+        )
+        
+        return {
+            "success": False,
+            "data": None,
+            "node_used": primary_node,
+            "failover": True,
+            "error": str(last_error) if last_error else "All fallbacks failed"
+        }
     
     def handle_write_failure(self, tweet_id, user_id, text, primary_node, exception):
         """
@@ -141,12 +156,21 @@ class FailoverManager:
         """
         logging.warning(f"[Failover] Write failure on {primary_node} for tweet {tweet_id}: {exception}")
         
-        # Get replica node
-        replica_node = self.replication_manager.replica_selector.get_replica_node(primary_node)
-        if not replica_node:
+        # Get all possible fallback nodes
+        fallback_nodes = []
+        try:
+            physical_nodes = self.replication_manager.replica_selector.physical_nodes
+            primary_index = physical_nodes.index(primary_node)
+            for i in range(1, len(physical_nodes)):
+                replica_index = (primary_index + i) % len(physical_nodes)
+                fallback_nodes.append(physical_nodes[replica_index])
+        except ValueError:
+            pass
+            
+        if not fallback_nodes:
             self.event_logger.log_event(
                 "failover", tweet_id, primary_node, None, "write_failed_no_replica",
-                f"No replica available for {primary_node}"
+                f"No fallback nodes available for {primary_node}"
             )
             return {
                 "success": False,
@@ -155,47 +179,53 @@ class FailoverManager:
                 "error": "No replica available"
             }
         
-        # Write to replica
-        logging.info(f"[Failover] Writing to replica {replica_node}")
-        try:
-            success = self._attempt_write(tweet_id, user_id, text, replica_node, self.config.REQUEST_TIMEOUT)
-            logging.info(f"[Failover] Write successful on replica {replica_node}")
-            
-            self.event_logger.log_event(
-                "failover", tweet_id, primary_node, replica_node, "write_failover",
-                f"Write redirected from {primary_node} to {replica_node}"
-            )
-            
-            # Emit WebSocket event
-            if self.websocket_manager:
-                self.websocket_manager.emit_failover_event({
-                    "timestamp": self.event_logger.memory_events[-1]["timestamp"],
-                    "event_type": "failover",
-                    "tweet_id": tweet_id,
-                    "primary_node": primary_node,
-                    "replica_node": replica_node,
-                    "action": "write_failover"
-                })
-            
-            return {
-                "success": True,
-                "node_used": replica_node,
-                "failover": True
-            }
-        except Exception as failover_exception:
-            logging.error(f"[Failover] Failover write failed on {replica_node}: {failover_exception}")
-            
-            self.event_logger.log_event(
-                "failover", tweet_id, primary_node, replica_node, "write_failover_failed",
-                f"Write failed on both primary and replica"
-            )
-            
-            return {
-                "success": False,
-                "node_used": replica_node,
-                "failover": True,
-                "error": str(failover_exception)
-            }
+        last_error = None
+        for replica_node in fallback_nodes:
+            # Write to replica
+            logging.info(f"[Failover] Attempting to write to fallback replica {replica_node}")
+            try:
+                success = self._attempt_write(tweet_id, user_id, text, replica_node, self.config.REQUEST_TIMEOUT)
+                logging.info(f"[Failover] Write successful on fallback replica {replica_node}")
+                
+                self.event_logger.log_event(
+                    "failover", tweet_id, primary_node, replica_node, "write_failover",
+                    f"Write redirected from {primary_node} to {replica_node}"
+                )
+                
+                # Emit WebSocket event
+                if self.websocket_manager:
+                    self.websocket_manager.emit_failover_event({
+                        "timestamp": self.event_logger.memory_events[-1]["timestamp"],
+                        "event_type": "failover",
+                        "tweet_id": tweet_id,
+                        "primary_node": primary_node,
+                        "replica_node": replica_node,
+                        "action": "write_failover"
+                    })
+                
+                return {
+                    "success": True,
+                    "node_used": replica_node,
+                    "failover": True
+                }
+            except Exception as failover_exception:
+                logging.warning(f"[Failover] Failover write failed on {replica_node}: {failover_exception}")
+                last_error = failover_exception
+                continue
+
+        # If all fallbacks failed
+        logging.error(f"[Failover] All fallback writes failed for primary {primary_node}. Last error: {last_error}")
+        self.event_logger.log_event(
+            "failover", tweet_id, primary_node, None, "write_failover_failed",
+            f"Write failed on primary and all fallbacks"
+        )
+        
+        return {
+            "success": False,
+            "node_used": primary_node,
+            "failover": True,
+            "error": str(last_error) if last_error else "All fallbacks failed"
+        }
     
     def _attempt_read(self, tweet_id, shard_name, timeout):
         """
@@ -253,7 +283,7 @@ class FailoverManager:
         
         try:
             transport.open()
-            success = client.storeTweet(tweet_id, user_id, text)
+            success = client.storeTweet(tweet_id, user_id, text, False)
             transport.close()
             return success
         except Exception as e:
