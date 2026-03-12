@@ -27,7 +27,7 @@ class ReplicationManager:
         """
         self.hash_ring = hash_ring
         self.shard_lookup = shard_lookup
-        self.replica_selector = ReplicaSelector(hash_ring)
+        self.replica_selector = ReplicaSelector(hash_ring, shard_lookup)
         # Track replication metadata
         self.replication_map = {}
         self.replica_data = {}

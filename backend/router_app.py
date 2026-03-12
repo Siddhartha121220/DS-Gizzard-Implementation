@@ -432,6 +432,28 @@ def get_replication_map():
         "stats": replication_manager.get_replication_stats()
     }), 200
 
+@app.route('/replication/topology', methods=['GET'])
+def get_replication_topology():
+    """Fetch the static Primary -> Replica mapping for all shards."""
+    topology = []
+    for shard in shard_lookup.keys():
+        replica_set = replication_manager.replica_selector.get_full_replica_set(shard)
+        primary = replica_set['primary']
+        replicas = replica_set['replicas']
+        
+        replica_node = replicas[0] if replicas else None
+        
+        topology.append({
+            "primary_node": primary,
+            "primary_server": shard_lookup[primary]["server"],
+            "primary_host": shard_lookup[primary]["host"],
+            "replica_node": replica_node,
+            "replica_server": shard_lookup[replica_node]["server"] if replica_node else "N/A",
+            "replica_host": shard_lookup[replica_node]["host"] if replica_node else "N/A"
+        })
+    
+    return jsonify(topology), 200
+
 @app.route('/nodes/status', methods=['GET'])
 def get_nodes_status():
     """Get status of all nodes."""

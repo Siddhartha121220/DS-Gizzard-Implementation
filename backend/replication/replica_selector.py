@@ -6,56 +6,63 @@ Replication factor = 2 (primary + 1 replica)
 
 
 class ReplicaSelector:
-    """Selects replica nodes based on consistent hash ring topology."""
+    """Selects replica nodes based on host-aware ring topology."""
 
-    def __init__(self, hash_ring):
+    def __init__(self, hash_ring, shard_lookup):
         """
-        Initialize replica selector with hash ring.
+        Initialize replica selector with hash ring and shard lookup.
         
         Args:
-            hash_ring: ConsistentHashRing instance with get_ring_state() method
+            hash_ring: ConsistentHashRing instance
+            shard_lookup: Dict mapping shard names to {host, port, server}
         """
         self.hash_ring = hash_ring
+        self.shard_lookup = shard_lookup
         self.ring_state = hash_ring.get_ring_state()
         self.nodes = self.ring_state.get('nodes', [])
-        self.build_node_index()
+        # Ordered list of physical shard names as they appear in the ring
+        self.ring_order = self.nodes
 
-    def build_node_index(self):
-        """Build a mapping of physical nodes for quick lookup."""
-        # Create a list of unique physical nodes (not virtual nodes)
-        self.physical_nodes = []
-        seen = set()
-        for node in self.nodes:
-            if node not in seen:
-                self.physical_nodes.append(node)
-                seen.add(node)
+    def _get_node_host(self, shard_name):
+        """Get the host (IP/Server) for a given shard."""
+        shard_info = self.shard_lookup.get(shard_name, {})
+        return shard_info.get('host') or shard_info.get('server')
 
     def get_replica_node(self, primary_node):
         """
         Get the replica node for a given primary node.
-        Replica is the next physical node clockwise in the hash ring.
+        Replica is the first node clockwise that is on a DIFFERENT host.
         
         Args:
             primary_node: The primary shard name (e.g., "Shard1")
             
         Returns:
-            The replica shard name (e.g., "Shard2"), or None if not enough nodes
+            The replica shard name, or None if no suitable replica found
         """
-        if len(self.physical_nodes) < 2:
-            # Cannot replicate with only 1 node
+        primary_host = self._get_node_host(primary_node)
+        if not primary_host:
             return None
 
         try:
-            primary_index = self.physical_nodes.index(primary_node)
-            replica_index = (primary_index + 1) % len(self.physical_nodes)
-            return self.physical_nodes[replica_index]
+            start_index = self.ring_order.index(primary_node)
+            ring_size = len(self.ring_order)
+            
+            # Search clockwise for a node on a different host
+            for i in range(1, ring_size):
+                candidate_index = (start_index + i) % ring_size
+                candidate_node = self.ring_order[candidate_index]
+                candidate_host = self._get_node_host(candidate_node)
+                
+                if candidate_host and candidate_host != primary_host:
+                    return candidate_node
+            
+            return None
         except ValueError:
-            # Primary node not found
             return None
 
     def get_replica_nodes(self, primary_node, replication_factor=2):
         """
-        Get multiple replica nodes (for future scalability).
+        Get multiple replica nodes on distinct hosts.
         
         Args:
             primary_node: The primary shard name
@@ -65,14 +72,28 @@ class ReplicaSelector:
             List of replica shard names (excludes primary)
         """
         replicas = []
-        if len(self.physical_nodes) < replication_factor:
+        primary_host = self._get_node_host(primary_node)
+        if not primary_host:
             return replicas
 
+        used_hosts = {primary_host}
+        
         try:
-            primary_index = self.physical_nodes.index(primary_node)
-            for i in range(1, replication_factor):
-                replica_index = (primary_index + i) % len(self.physical_nodes)
-                replicas.append(self.physical_nodes[replica_index])
+            start_index = self.ring_order.index(primary_node)
+            ring_size = len(self.ring_order)
+            
+            for i in range(1, ring_size):
+                if len(replicas) >= replication_factor - 1:
+                    break
+                    
+                candidate_index = (start_index + i) % ring_size
+                candidate_node = self.ring_order[candidate_index]
+                candidate_host = self._get_node_host(candidate_node)
+                
+                if candidate_host and candidate_host not in used_hosts:
+                    replicas.append(candidate_node)
+                    used_hosts.add(candidate_host)
+            
             return replicas
         except ValueError:
             return []
@@ -80,9 +101,6 @@ class ReplicaSelector:
     def get_full_replica_set(self, primary_node):
         """
         Get the complete replica set for a primary node.
-        
-        Returns:
-            Dict with 'primary' and 'replicas' keys
         """
         replicas = self.get_replica_nodes(primary_node, replication_factor=2)
         return {
